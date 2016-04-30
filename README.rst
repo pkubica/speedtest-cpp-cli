@@ -11,9 +11,6 @@ Compilling
 Windows: Compile with Visual Studio 
 Linux: gmake
 
-Just download (Like the way it used to be)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Usage
 -----
 
