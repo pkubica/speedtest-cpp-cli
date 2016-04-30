@@ -13,6 +13,11 @@ $RECYCLE.BIN/
 *.msi
 *.msm
 *.msp
+*.exe
+
+# Visual studio Files
+*DEBUG/
+*.vs/
 
 # Windows shortcuts
 *.lnk
