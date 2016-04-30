@@ -11,3 +11,6 @@ speedtest-cpp-cli.o: clientSocket.o parseArguments.o Source.cpp SharedQueue.hpp
 	${CC} ${CFLAGS} -c Source.cpp -o speedtest-cpp-cli.o
 speedtest-cpp-cli: speedtest-cpp-cli.o
 	${CC} ${CFLAGS} parseArguments.o clientSocket.o speedtest-cpp-cli.o -o speedtest-cpp-cli
+
+clean:
+	rm -rf parseArguments.o clientSocket.o speedtest-cpp-cli.o speedtest-cpp-cli

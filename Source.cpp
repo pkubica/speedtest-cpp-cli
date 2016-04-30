@@ -740,7 +740,7 @@ public:
 		std::vector<IncomingDataWorker *> workon;
 		std::vector<urlImage> images;
 
-		int workers_count = stoi(m_umapServerConfig.at("threadcount"))+2;
+		int workers_count = stoi(m_umapServerConfig.at("threadcount"));
 		if (workers_count == 0)
 			return; //EXCEPTION !!! 
 
