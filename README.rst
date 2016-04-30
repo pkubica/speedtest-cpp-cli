@@ -1,4 +1,4 @@
-speedtest--cpp-cli
+speedtest-cpp-cli
 =============
 
 Versions
