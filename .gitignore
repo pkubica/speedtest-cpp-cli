@@ -18,6 +18,7 @@ $RECYCLE.BIN/
 # Visual studio Files
 *DEBUG/
 *.vs/
+*.db
 
 # Windows shortcuts
 *.lnk

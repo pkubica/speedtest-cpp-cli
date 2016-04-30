@@ -105,12 +105,7 @@ size_t SocketClient::Recv(std::string &data, bool read_to_close)
 
 size_t SocketClient::_devNullRecv()
 {
-	size_t ret = 0, sum = 0;
-	while ((ret = recv(m_socSocket, m_cBuffer, sizeof(m_cBuffer), 0)) > 0)
-	{
-		sum += ret;
-	}	
-	return sum;
+	return recv(m_socSocket, m_cBuffer, sizeof(m_cBuffer), 0);
 }
 
 void SocketClient::setTimeout(int second)

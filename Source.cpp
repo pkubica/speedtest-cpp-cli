@@ -28,6 +28,7 @@
 
 using namespace std;
 
+bool SpeedTestMeasure;
 
 string getTagByName(std::string name, std::string &data)
 {
@@ -314,7 +315,7 @@ private:
 #endif
 
 		std::string search = "<server ";
-		size_t pos = data.find(search, 0); // find(search, data.begin());
+		size_t pos = data.find(search, 0);
 		if (pos < data.size())
 		{
 #ifdef DEBUG
@@ -353,7 +354,7 @@ private:
 		}
 	}
 
-	
+
 
 public:
 	bool checkifServerExists(int id)
@@ -363,9 +364,9 @@ public:
 
 	void printClientInfoMessages(std::string state)
 	{
-		if(state == "clientInfo")		
+		if (state == "clientInfo")
 			cout << "Testing from " << m_umapClient.at("isp") << " " << m_umapClient.at("ip") << "..." << endl;
-		if(state == "getConfiguration")
+		if (state == "getConfiguration")
 			cout << "Retrieving speedtest.net configuration..." << endl;
 		if (state == "getServerList")
 			cout << "Retrieving speedtest.net server list..." << endl;
@@ -400,7 +401,7 @@ public:
 	{
 		for (std::multimap<float, int>::iterator it = m_multimapDistance.begin(); it != m_multimapDistance.end(); ++it)
 		{
-			cout << it->second << ") " << m_mapServers.at(it->second).m_umapData.at("sponsor") << " (" << m_mapServers.at(it->second).m_umapData.at("name") << ", " << m_mapServers.at(it->second).m_umapData.at("country") << ") " << "["  << it->first << " km]" << endl;
+			cout << it->second << ") " << m_mapServers.at(it->second).m_umapData.at("sponsor") << " (" << m_mapServers.at(it->second).m_umapData.at("name") << ", " << m_mapServers.at(it->second).m_umapData.at("country") << ") " << "[" << it->first << " km]" << endl;
 		}
 	}
 
@@ -412,7 +413,7 @@ public:
 		{
 			sockfd.Connect();
 			std::string request = buildHTTPrequest("/speedtest-config.php", "www.speedtest.net", false);
-			sockfd.Send(request);			
+			sockfd.Send(request);
 			sockfd.Recv(data, true);
 			if (parseHTTPResponse(data) != 200)
 			{
@@ -433,13 +434,13 @@ public:
 		std::string upload = getTagByName("upload", data);
 		std::string latency = getTagByName("latency", data);
 		std::string server_config = getTagByName("server-config", data);
-/*
-		cout << client << endl;
-		cout << times << endl;
-		cout << download << endl;
-		cout << upload << endl;
-		cout << latency << endl;
-*/
+		/*
+				cout << client << endl;
+				cout << times << endl;
+				cout << download << endl;
+				cout << upload << endl;
+				cout << latency << endl;
+		*/
 		parseTagAttributes(client, m_umapClient);
 		parseTagAttributes(times, m_umapTimes);
 		parseTagAttributes(download, m_umapDownload);
@@ -466,7 +467,7 @@ public:
 		u = sin((lat - m_dLat) / 2);
 		v = sin((lon - m_dLon) / 2);
 		w = u * u + cos(m_dLat) * cos(lat) * v * v;
-		return (2.0f * radius * atan2(sqrt(w), sqrt(1-w)));
+		return (2.0f * radius * atan2(sqrt(w), sqrt(1 - w)));
 	}
 
 	void getClosestServers()
@@ -515,11 +516,11 @@ public:
 	{
 		if (!checkifServerExists(id)) return 1 * 60 * 1000 * 1000; //minutes
 			//TODO EXCEPTION - server doesnt exits
-		
+
 		string url = m_mapServers.at(id).m_umapData.at("url");
 
 		//SERVER URL remove end to slash
-		removeFileFromHTTPAdress(url); 
+		removeFileFromHTTPAdress(url);
 		string host = "";
 		splitUrlIntoPageHost(url, host);
 
@@ -598,31 +599,31 @@ public:
 		std::vector<int64_t> latency;
 		std::vector<int> serverID;
 		int j = 0;
-			for (std::multimap<float, int>::iterator it = m_multimapDistance.begin(); it != m_multimapDistance.end() && j != m_constNumber_of_srv_lat; ++it,++j)
-			{
-				//try based on ID
-				//NOTE SRVID
-				int64_t server_latency;
-				server_latency = getLatencyByServer(it->second);
-				serverID.push_back(it->second);
-				latency.push_back(server_latency);
-			}
+		for (std::multimap<float, int>::iterator it = m_multimapDistance.begin(); it != m_multimapDistance.end() && j != m_constNumber_of_srv_lat; ++it, ++j)
+		{
+			//try based on ID
+			//NOTE SRVID
+			int64_t server_latency;
+			server_latency = getLatencyByServer(it->second);
+			serverID.push_back(it->second);
+			latency.push_back(server_latency);
+		}
 
-			//get minimum 
-			latence_time = *(latency.begin());
-			unsigned int minimum_pos = 0;
-			for (unsigned int i = 0; i < latency.size(); ++i)
+		//get minimum 
+		latence_time = *(latency.begin());
+		unsigned int minimum_pos = 0;
+		for (unsigned int i = 0; i < latency.size(); ++i)
+		{
+			if (latence_time > latency.at(i))
 			{
-				if (latence_time > latency.at(i))
-				{
-					minimum_pos = i;
-					latence_time = latency.at(i);
-				}
+				minimum_pos = i;
+				latence_time = latency.at(i);
 			}
+		}
 
-			//get ID server
-			//return ID			
-			return serverID.at(minimum_pos);
+		//get ID server
+		//return ID			
+		return serverID.at(minimum_pos);
 	}
 
 	class urlImage
@@ -631,7 +632,8 @@ public:
 		std::string m_sHost;
 		std::string m_sRequest;
 		size_t m_iData_count;
-		//int64_t m_i64Duration;
+
+
 		//int64_t m_i64Timeout;
 		//int64_t m_i64Start_time;
 		SocketClient *sockfd;
@@ -644,7 +646,6 @@ public:
 			splitUrlIntoPageHost(m_sUrl, m_sHost);
 			m_sRequest = buildHTTPrequest(m_sUrl, m_sHost, false);
 			sockfd = new SocketClient(AF_INET, SOCK_STREAM, IPPROTO_TCP, "", m_sHost, HTTP_PORT);
-			sockfd->setTimeout(0);
 			try
 			{
 				//cout << "connected" << endl;
@@ -672,13 +673,16 @@ public:
 		{
 			try
 			{
+
+
 				sockfd->Connect();
 				//check started time
 				//cout << "sending request" << endl;
 				sockfd->Send(m_sRequest);
 				//cout << "req:" << m_sRequest << endl;
-
-				m_iData_count = sockfd->_devNullRecv();
+				size_t ret;
+				while (SpeedTestMeasure && ((ret = sockfd->_devNullRecv()) > 0))
+					m_iData_count += ret;
 				//cout << "transferred" << endl;
 				return;
 			}
@@ -692,17 +696,37 @@ public:
 
 	class IncomingDataWorker //: public thread // Thread
 	{
+		int64_t m_i64Duration;
 		SharedQueue<urlImage *>& m_sqSourceQueue;
 		SharedQueue<urlImage *>& m_sqTargetQueue;
 
 	public:
-		IncomingDataWorker(SharedQueue<urlImage *>& source_queue, SharedQueue<urlImage *>& target_queue) : m_sqSourceQueue(source_queue), m_sqTargetQueue(target_queue) {}
+#if __cplusplus >= 199711L
+		std::chrono::high_resolution_clock::time_point start_time;
+		std::chrono::high_resolution_clock::time_point check_time;
+		std::chrono::high_resolution_clock::time_point run_time;
+#else
+		std::chrono::time_point<std::chrono::monotonic_clock> start_time;
+		std::chrono::time_point<std::chrono::monotonic_clock> check_time;
+		std::chrono::time_point<std::chrono::monotonic_clock> run_time;
+#endif
+
+		IncomingDataWorker(SharedQueue<urlImage *>& source_queue, SharedQueue<urlImage *>& target_queue, 
+			std::chrono::high_resolution_clock::time_point start) : m_sqSourceQueue(source_queue), m_sqTargetQueue(target_queue), start_time(start) {}
 
 		void run() {
+			run_time = chrono::high_resolution_clock::now();
 			for (int i = 0;; i++) {
 				//cout << "run is runned" << endl;
 				if (m_sqSourceQueue.isThereaWork() > 0)
 				{
+					check_time = chrono::high_resolution_clock::now();
+					m_i64Duration = chrono::duration_cast<chrono::seconds>(check_time - start_time).count();
+					if (m_i64Duration > 10 || !SpeedTestMeasure)
+					{
+						SpeedTestMeasure = false;
+						return; //10sec test
+					}
 					//cout << "want thread get item" << endl;
 					urlImage *item = m_sqSourceQueue.soIgetIt();
 					//cout << "thread get item" << endl;
@@ -713,37 +737,37 @@ public:
 				}
 				else
 				{
+					check_time = chrono::high_resolution_clock::now();
 					return;
 				}
 			}
+			check_time = chrono::high_resolution_clock::now();
 			return;
 		}
 	};
 
-	void speedtestDownload(int id)
+	double speedtestDownload(int id)
 	{
 
 		if (!checkifServerExists(id))
-			return;
+			return 0;
+
+		int workers_count = stoi(m_umapServerConfig.at("threadcount"));
+		if (workers_count == 0)
+			return 0; //EXCEPTION !!! 
 
 		std::list<std::string> urls;
 		std::string url = m_mapServers.at(id).m_umapData.at("url");
 		removeFileFromHTTPAdress(url);
 
 		buildIMGrequests(url, urls);
-		
+
 		SharedQueue<urlImage *> qsource;
 		SharedQueue<urlImage *> qtarget;
 
 		std::vector<thread *> workers;
-	//	std::vector<thread> workers;
 		std::vector<IncomingDataWorker *> workon;
 		std::vector<urlImage> images;
-
-		int workers_count = stoi(m_umapServerConfig.at("threadcount"));
-		if (workers_count == 0)
-			return; //EXCEPTION !!! 
-
 
 #if __cplusplus >= 199711L
 		std::chrono::high_resolution_clock::time_point start_time;
@@ -753,46 +777,70 @@ public:
 		std::chrono::time_point<std::chrono::monotonic_clock> end_time;
 #endif
 
-		cout << "Starting test - download speed";
-		//cout << "Creating urlImage && Incoming data worker" << endl;
+
+		SpeedTestMeasure = true;
+		start_time = chrono::high_resolution_clock::now();
+
 		for (std::list<std::string>::iterator it = urls.begin(); it != urls.end(); ++it)
 		{
 			qsource.add(new urlImage(*it));
-			workon.push_back(new IncomingDataWorker(qsource, qtarget));
 		}
-		
+
+		int count_images = urls.size();
+			
 		for (int i = 0; i < workers_count; ++i)
 		{
-			//cout << "Running thread:" << i << endl;
-			//cout << "Workon size:" << workon.size() << endl;
+			workon.push_back(new IncomingDataWorker(qsource, qtarget, start_time));
+		}
+
+
+		for (int i = 0; i < workers_count; ++i)
+		{
 			workers.push_back(new thread(&IncomingDataWorker::run, workon.at(i)));
 		}
-		start_time = chrono::high_resolution_clock::now();
 
 		for (int i = 0; i < workers_count; ++i)
 		{
-			//cout << "Joining thread:" << i << endl;
 			workers.at(i)->join();
-		}				
-		end_time = chrono::high_resolution_clock::now();
+		}
+
+
+
+		std::chrono::high_resolution_clock::time_point max_start = workon.at(0)->run_time;
+		std::chrono::high_resolution_clock::time_point min_end = workon.at(0)->check_time;
+		for (int i = 0; i < workers_count; ++i)
+		{
+			if (max_start < workon.at(i)->run_time)
+			{
+				max_start = workon.at(i)->run_time;
+			}
+			if (min_end > workon.at(i)->check_time)
+			{
+				min_end = workon.at(i)->check_time;
+			}
+		}
+
 
 		int64_t sum = 0;
-		int64_t time = chrono::duration_cast<chrono::microseconds>(end_time - start_time).count();
+		int64_t time = chrono::duration_cast<chrono::microseconds>(min_end - max_start).count();
 
-		while(qtarget.size() > 0)
+		while (qtarget.size() > 0)
 		{
 			urlImage *item = qtarget.remove();
 			sum += item->getResult();
 			delete item;
 		}
 
+		while (qsource.size() > 0)
+		{
+			urlImage *item = qsource.remove();
+			delete item;
+		}
+
 		double speed = (double) sum / time;
-		//cout << "time:" << time << endl;
-		//cout << "sum:" << sum << endl;
-		//cout << "speed:" << speed << endl;
 		double mbps = speed * 8;
 		cout << endl;
-		cout << "Download speed: " << mbps << " MBit/s"<< endl;
+		return mbps;
 
 	}
 
@@ -804,19 +852,9 @@ public:
 		m_mapServerUrls.insert(std::pair<string, string>("c.speedtest.net", "/speedtest-servers-static.php"));
 		m_mapServerUrls.insert(std::pair<string, string>("www.speedtest.net", "/speedtest-servers.php"));
 		m_mapServerUrls.insert(std::pair<string, string>("c.speedtest.net", "/speedtest-servers.php"));
-			
 	}
 
 };
-
-/* Function for building User Agent (HTTP request) */
-
-
-
-
-
-
-
 
 
 int main(int argc, char *argv [])
@@ -835,6 +873,9 @@ int main(int argc, char *argv [])
 	op.addArgument("distance", "", "Display a list of speedtest.net servers within a distance", true, false);
 	op.addArgument("server", "", "Specify a server ID", true, false);
 	op.addArgument("version", "", "Show the version number and exit", false, false);
+	op.addArgument("download", "", "Test only download speed", false, false);
+	op.addArgument("upload", "", "Test only upload speed (NOT IMPLEMENTED)", false, false);
+	op.addArgument("share", "", "Get url of image about results on speedtest.net (NOT IMPLEMENTED)", false, false);
 
 	try
 	{
@@ -848,9 +889,6 @@ int main(int argc, char *argv [])
 		return EXIT_FAILURE;
 	}
 
-	//SocketClient *sockfd;
-
-
 	if (op.checkIfSet("help"))
 	{
 		op.help();
@@ -863,88 +901,65 @@ int main(int argc, char *argv [])
 		return EXIT_SUCCESS;
 	}
 
-/*	if (op.checkIfSet("secure"))
-	{
-
-	}*/
-
-	if (op.checkIfSet("source"))
-	{
-		std::string source = op.getParamValue("source");
-		//sockfd = new SocketClient(AF_INET, SOCK_STREAM, IPPROTO_TCP, source, "", HTTP_PORT);
-	}
-	else
-	{
-		//sockfd = new SocketClient(AF_INET, SOCK_STREAM, IPPROTO_TCP, "", "www.speedtest.net", HTTP_PORT);
-	}
-/*
-	std::string host = "tmp.teranode.cz";
-	std::string page = "/alphabet.html";
-	std::string userAgent = "Mozilla/5.0 "
-#ifdef __linux__ 
-		"(Linux; U; 64bit; en-us; Trident/5.0) "
-#elif _WIN32
-		"(Windows; U; 32bit; en-us) "
-#else
-#error Platform not supported
-#endif
-		"(KHTML, like Gecko) "
-		PROGRAM_NAME "/"
-		VERSION;
-
-	std::string request =
-		"GET " + page + " HTTP/1.1\r\n"
-		"Accept-Encoding: identity\r\n"
-		"Host: " + host + "\r\n"
-		"User-Agent: " + userAgent + "\r\n"
-		"Connection: close\r\n"
-		"\r\n";
-	SocketClient sockfd(AF_INET, SOCK_STREAM, IPPROTO_TCP, "", "tmp.teranode.cz", HTTP_PORT);
-	sockfd.Connect();
-	sockfd.Send(request);
-	std::string data;
-	sockfd.Recv(data, true);
-	
-	cout << data;
-	*/
-
 	SpeedTestClient client;
 	cout << "Getting speedtest.net configuration..." << endl;
 	client.getConfig();
 	client.printClientInfo();
+	cout << "Looking for speedtest.net servers..." << endl;
+	client.getClosestServers();
 
 	if (op.checkIfSet("list"))
 	{
-		client.getClosestServers();
 		client.getListOfServer();
 		return EXIT_SUCCESS;
 	}
-	
+
 	if (op.checkIfSet("distance"))
 	{
 		std::string value = op.getParamValue("distance");
-		client.getClosestServers();
 		client.getNearestServerToKM(stoi(value));
+		return EXIT_SUCCESS;
 	}
 
-	cout << "Looking for speedtest.net servers..." << endl;
-	client.getClosestServers();
+	int server;
 	int64_t latency;
-	cout << "Getting best speedtest.net server based on latency..." << endl;
-	int server = client.getLatency(latency);
-	//cout << "Latence:" << latence << endl;
-	client.printServerInfo(server, latency);
-	client.speedtestDownload(server);
-
-	if (op.checkIfSet("timeout"))
-	{
-		
-	}
 
 	if (op.checkIfSet("server"))
 	{
-
+		if (client.checkifServerExists(stoi(op.getParamValue("server"))))
+		{
+			server = stoi(op.getParamValue("server"));
+			cout << "Checking latency of specified server..." << endl;
+			latency = client.getLatencyByServer(server);
+		}
+		else
+		{
+			cout << "Server ID " << op.getParamValue("server") << " doesn't exists." << endl;
+			return EXIT_FAILURE;
+		}
+	
 	}
+	else
+	{
+		cout << "Getting best speedtest.net server based on latency..." << endl;
+		server = client.getLatency(latency);
+	}
+
+	client.printServerInfo(server, latency);
+	
+	if (!op.checkIfSet("upload") || op.checkIfSet("download"))
+	{
+		cout << "Starting test - download speed";
+		double dspeed = client.speedtestDownload(server);
+		cout << "Download speed: " << dspeed << " MBit/s" << endl;
+	}
+
+	if (!op.checkIfSet("download") || op.checkIfSet("upload"))
+	{
+		cout << "Upload speed for now is not implemented" << endl;
+	}
+
+	
 
 	return EXIT_SUCCESS;
 }
