@@ -3,12 +3,12 @@ speedtest--cpp-cli
 
 Versions
 --------
-GCC for C++11
+GCC for C++11, 
 Windows & Linux 
 
 Compilling
 ------------
-Windows: Compile with Visual Studio 
+Windows: Compile with Visual Studio,
 Linux: gmake
 
 Usage

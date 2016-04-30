@@ -528,8 +528,8 @@ public:
 		std::list<int64_t> request_latence;
 		std::string response;
 #if __cplusplus >= 199711L
-		std::chrono::time_point<std::chrono::steady_clock> start_time;
-		std::chrono::time_point<std::chrono::steady_clock> end_time;
+		std::chrono::high_resolution_clock::time_point start_time;
+		std::chrono::high_resolution_clock::time_point end_time;
 #else
 		std::chrono::time_point<std::chrono::monotonic_clock> start_time;
 		std::chrono::time_point<std::chrono::monotonic_clock> end_time;
@@ -746,8 +746,8 @@ public:
 
 
 #if __cplusplus >= 199711L
-		std::chrono::time_point<std::chrono::steady_clock> start_time;
-		std::chrono::time_point<std::chrono::steady_clock> end_time;
+		std::chrono::high_resolution_clock::time_point start_time;
+		std::chrono::high_resolution_clock::time_point end_time;
 #else
 		std::chrono::time_point<std::chrono::monotonic_clock> start_time;
 		std::chrono::time_point<std::chrono::monotonic_clock> end_time;
