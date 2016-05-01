@@ -149,6 +149,7 @@
   <ItemGroup>
     <ClInclude Include="parseArguments.hpp" />
     <ClInclude Include="SharedQueue.hpp" />
+    <ClInclude Include="SharedVariable.hpp" />
     <ClInclude Include="Socket.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

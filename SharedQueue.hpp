@@ -1,9 +1,9 @@
 #pragma once
 #include <list>
-
-#if 1 == 1 //__cplusplus >= 199711L
 #include <mutex>
 #include <condition_variable>
+
+#if 1 == 1 //__cplusplus >= 199711L
 
 template <typename T> class SharedQueue
 {

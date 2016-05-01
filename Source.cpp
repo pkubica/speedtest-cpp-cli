@@ -1,7 +1,17 @@
-/*#if __cplusplus > 199711L
-#error This program needs at least a C++11 compliant compiler
-#endif*/
-//#define DEBUG
+#if __cplusplus >= 199711L
+#if __GXX_EXPERIMENTAL_CXX0X__
+#if __linux__
+#include <sleep.h>
+#include <unistd.h>
+#include <time.h>
+#else
+
+#endif	
+
+#endif
+
+#endif
+
 
 #include <iostream>
 #include <string>
@@ -17,6 +27,7 @@
 #include "parseArguments.hpp"
 #include "Socket.hpp"
 #include "SharedQueue.hpp"
+#include "SharedVariable.hpp"
 
 #define VERSION "0.0.0-1"
 #define PROGRAM_NAME "speedtest-cpp-cli"
@@ -29,6 +40,10 @@
 using namespace std;
 
 bool SpeedTestMeasure;
+
+SharedQueue<size_t> SpeedResults;
+
+SharedVariable<int> SpeedStatus;
 
 string getTagByName(std::string name, std::string &data)
 {
@@ -682,8 +697,7 @@ public:
 				//cout << "req:" << m_sRequest << endl;
 				size_t ret;
 				while (SpeedTestMeasure && ((ret = sockfd->_devNullRecv()) > 0))
-					m_iData_count += ret;
-				//cout << "transferred" << endl;
+					SpeedResults.add(ret); //SIZE OF BUFFER ON SOCKET -- TODO: TESTING
 				return;
 			}
 			catch (...)
@@ -701,54 +715,36 @@ public:
 		SharedQueue<urlImage *>& m_sqTargetQueue;
 
 	public:
-#if __cplusplus >= 199711L
-		std::chrono::high_resolution_clock::time_point start_time;
-		std::chrono::high_resolution_clock::time_point check_time;
-		std::chrono::high_resolution_clock::time_point run_time;
-#else
-		std::chrono::time_point<std::chrono::monotonic_clock> start_time;
-		std::chrono::time_point<std::chrono::monotonic_clock> check_time;
-		std::chrono::time_point<std::chrono::monotonic_clock> run_time;
-#endif
-
-		IncomingDataWorker(SharedQueue<urlImage *>& source_queue, SharedQueue<urlImage *>& target_queue, 
-			std::chrono::high_resolution_clock::time_point start) : m_sqSourceQueue(source_queue), m_sqTargetQueue(target_queue), start_time(start) {}
+		IncomingDataWorker(SharedQueue<urlImage *>& source_queue, SharedQueue<urlImage *>& target_queue) : m_sqSourceQueue(source_queue), m_sqTargetQueue(target_queue){}
 
 		void run() {
-			run_time = chrono::high_resolution_clock::now();
 			for (int i = 0;; i++) {
 				//cout << "run is runned" << endl;
 				if (m_sqSourceQueue.isThereaWork() > 0)
 				{
-					check_time = chrono::high_resolution_clock::now();
-					m_i64Duration = chrono::duration_cast<chrono::seconds>(check_time - start_time).count();
-					if (m_i64Duration > 10 || !SpeedTestMeasure)
+					if (!SpeedTestMeasure)
 					{
-						SpeedTestMeasure = false;
 						return; //10sec test
 					}
 					//cout << "want thread get item" << endl;
 					urlImage *item = m_sqSourceQueue.soIgetIt();
 					//cout << "thread get item" << endl;
 					item->run();
-					cout << ".";
 					//cout << "thread did item result: " << item->getResult() << endl;
-					m_sqTargetQueue.add(item);
+					delete item;
+					//m_sqTargetQueue.add(item);
 				}
 				else
 				{
-					check_time = chrono::high_resolution_clock::now();
+					SpeedStatus.set(SpeedStatus.get()+1);
 					return;
 				}
 			}
-			check_time = chrono::high_resolution_clock::now();
-			return;
 		}
 	};
 
 	double speedtestDownload(int id)
 	{
-
 		if (!checkifServerExists(id))
 			return 0;
 
@@ -768,29 +764,33 @@ public:
 		std::vector<thread *> workers;
 		std::vector<IncomingDataWorker *> workon;
 		std::vector<urlImage> images;
+		std::list<double> speeds; 
 
 #if __cplusplus >= 199711L
 		std::chrono::high_resolution_clock::time_point start_time;
+		std::chrono::high_resolution_clock::time_point check_time;
+		std::chrono::high_resolution_clock::time_point test_time;
 		std::chrono::high_resolution_clock::time_point end_time;
 #else
 		std::chrono::time_point<std::chrono::monotonic_clock> start_time;
+		std::chrono::time_point<std::chrono::monotonic_clock> check_time;
+		std::chrono::time_point<std::chrono::monotonic_clock> test_time;
 		std::chrono::time_point<std::chrono::monotonic_clock> end_time;
 #endif
 
 
 		SpeedTestMeasure = true;
+
 		start_time = chrono::high_resolution_clock::now();
 
 		for (std::list<std::string>::iterator it = urls.begin(); it != urls.end(); ++it)
 		{
 			qsource.add(new urlImage(*it));
 		}
-
-		int count_images = urls.size();
 			
 		for (int i = 0; i < workers_count; ++i)
 		{
-			workon.push_back(new IncomingDataWorker(qsource, qtarget, start_time));
+			workon.push_back(new IncomingDataWorker(qsource, qtarget));
 		}
 
 
@@ -799,48 +799,99 @@ public:
 			workers.push_back(new thread(&IncomingDataWorker::run, workon.at(i)));
 		}
 
+
+		start_time = chrono::high_resolution_clock::now(); //SET TIMEOUT
+		SpeedStatus.set(0);
+		size_t datasize;
+		int64_t time;
+		check_time = chrono::high_resolution_clock::now();
+		//cout << "count_images" << count_images << endl;
+		while (SpeedStatus.get() != workers_count)
+		{
+			datasize = 0;
+			while (SpeedResults.size() > 0)
+			{
+				datasize += SpeedResults.remove();
+			}
+
+#if __cplusplus >= 199711L
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
+#else
+#ifdef __linux__
+			usleep(200000);
+#else
+			Sleep(200);
+#endif
+#endif
+			
+			if (datasize == 0)
+			{
+				test_time = chrono::high_resolution_clock::now();
+				if (chrono::duration_cast<chrono::seconds>(check_time - start_time).count() > 10)
+				{
+					break;
+				}
+			}
+				
+			end_time = chrono::high_resolution_clock::now();
+			time = chrono::duration_cast<chrono::milliseconds>(end_time - check_time).count();
+			datasize /= 1000;
+			speeds.push_back((double) datasize * 8 / time);
+			cout << "\rDownload speed: " << speeds.back() << " MBit/s";
+			cout.flush();
+
+			check_time = chrono::high_resolution_clock::now();
+			if (chrono::duration_cast<chrono::seconds>(check_time - start_time).count() > 10)
+			{
+				break;
+			}
+		}
+
+
+		double speed_max = 0;
+		double speed_sum = 0;
+		int speed_count = 0;
+
+		for (size_t i = 0; i < speeds.size(); ++i)
+		{
+			if (speed_max < speeds.front())
+			{
+				speed_max = speeds.front();
+			}
+			speed_sum += speeds.front();
+			++speed_count;
+			speeds.pop_front();
+		}
+
+		double avg_speed = speed_sum / speed_count;
+
+		cout << "\rMaximum download speed: " << speed_max << " MBit/s" << endl;
+		cout << "Average download speed: " << avg_speed << " MBit/s" << endl;
+		
+		SpeedTestMeasure = false;
+
 		for (int i = 0; i < workers_count; ++i)
 		{
 			workers.at(i)->join();
 		}
 
 
-
-		std::chrono::high_resolution_clock::time_point max_start = workon.at(0)->run_time;
-		std::chrono::high_resolution_clock::time_point min_end = workon.at(0)->check_time;
-		for (int i = 0; i < workers_count; ++i)
-		{
-			if (max_start < workon.at(i)->run_time)
-			{
-				max_start = workon.at(i)->run_time;
-			}
-			if (min_end > workon.at(i)->check_time)
-			{
-				min_end = workon.at(i)->check_time;
-			}
-		}
-
-
-		int64_t sum = 0;
-		int64_t time = chrono::duration_cast<chrono::microseconds>(min_end - max_start).count();
-
 		while (qtarget.size() > 0)
 		{
 			urlImage *item = qtarget.remove();
-			sum += item->getResult();
 			delete item;
 		}
 
-		while (qsource.size() > 0)
+	/*	while (qsource.size() > 0)
 		{
 			urlImage *item = qsource.remove();
 			delete item;
-		}
+		}*/
 
-		double speed = (double) sum / time;
+	/*	double speed = (double) sum / time;
 		double mbps = speed * 8;
-		cout << endl;
-		return mbps;
+		cout << endl;*/
+		return avg_speed;
 
 	}
 
@@ -951,7 +1002,7 @@ int main(int argc, char *argv [])
 	{
 		cout << "Starting test - download speed";
 		double dspeed = client.speedtestDownload(server);
-		cout << "Download speed: " << dspeed << " MBit/s" << endl;
+		//cout << "Download speed: " << dspeed << " MBit/s" << endl;
 	}
 
 	if (!op.checkIfSet("download") || op.checkIfSet("upload"))
