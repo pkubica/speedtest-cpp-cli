@@ -836,7 +836,8 @@ public:
 			time = chrono::duration_cast<chrono::milliseconds>(end_time - check_time).count();
 			datasize /= 1000;
 			speeds.push_back((double) datasize * 8 / time);
-			cout << "\rDownload speed: " << speeds.back() << " MBit/s";
+			//cout << "\rDownload speed: " << speeds.back() << " MBit/s";
+			cout << ".";
 			cout.flush();
 
 			check_time = chrono::high_resolution_clock::now();
@@ -863,8 +864,8 @@ public:
 		}
 
 		double avg_speed = speed_sum / speed_count;
-
-		cout << "\rMaximum download speed: " << speed_max << " MBit/s" << endl;
+		cout << endl;
+		cout << "Maximum download speed: " << speed_max << " MBit/s" << endl;
 		cout << "Average download speed: " << avg_speed << " MBit/s" << endl;
 		
 		SpeedTestMeasure = false;
