@@ -142,15 +142,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Socket.cpp" />
-    <ClCompile Include="Source.cpp" />
-    <ClCompile Include="parseArguments.cpp" />
-  </ItemGroup>
-  <ItemGroup>
+    <ClInclude Include="Exception.hpp" />
+    <ClInclude Include="HTTPSimple.hpp" />
     <ClInclude Include="parseArguments.hpp" />
     <ClInclude Include="SharedQueue.hpp" />
     <ClInclude Include="SharedVariable.hpp" />
     <ClInclude Include="Socket.hpp" />
+    <ClInclude Include="TAGParser.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="HTTPSimple.cpp" />
+    <ClCompile Include="parseArguments.cpp" />
+    <ClCompile Include="Socket.cpp" />
+    <ClCompile Include="Source.cpp" />
+    <ClCompile Include="TAGParser.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
