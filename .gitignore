@@ -20,6 +20,8 @@ $RECYCLE.BIN/
 *.vs/
 *.db
 *.opendb
+*.vxcproj
+*.filters
 
 # Windows shortcuts
 *.lnk
