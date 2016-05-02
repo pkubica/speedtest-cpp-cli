@@ -19,7 +19,7 @@ SocketClient::SocketClient(int domain, int type, int protocol, std::string IPadd
 	WSADATA wsaData;
 
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-		std::cout << "WSAStartup failed.\n"; //DEBUG
+		throw Exception("WSA startup failed");
 		system("pause"); //DEBUG
 		return;
 	}
@@ -29,7 +29,6 @@ SocketClient::SocketClient(int domain, int type, int protocol, std::string IPadd
 
 	if (m_socSocket == INVALID_SOCKET)
 	{
-		std::cout << "Problem INVALID SOCKET" << std::endl;
 		throw Exception("Cannot create socket"); //TODO: exception cannot create socket
 	}
 
@@ -46,7 +45,6 @@ SocketClient::SocketClient(int domain, int type, int protocol, std::string IPadd
 		host = gethostbyname(m_sHostname.c_str());
 		if (host == NULL && m_sIPaddress == "")
 		{
-			std::cout << "Problem Resolv" << std::endl;
 			//TODO: cannot resolv hostname //strerror(errno) -- message
 			throw Exception("Cannot resolve hostname " + m_sHostname);
 		}
@@ -72,14 +70,23 @@ void SocketClient::Connect()
 {
 	if (connect(m_socSocket, (sockaddr*) (&m_SockAddr), sizeof(m_SockAddr)) != 0) {
 		//TODO: exception cannot connect
-		throw Exception("Cannot connect to host");
+		throw Exception("Cannot connect to server");
 	}
 	//std::cout << "Connected.\n"; //DEBUG
 }
 
 size_t SocketClient::Send(std::string &data)
 {
-	return send(m_socSocket, data.c_str(), (int) data.size(), 0);
+	size_t size_to_send = data.size();
+	const char *ptr = data.c_str();
+	size_t sended = 0;
+	int ret;
+	while ((size_to_send - sended) > 0)
+	{
+		ret = send(m_socSocket, &(ptr[sended]), (int) data.size(), 0);
+		if (ret == -1) throw Exception("Cannot send data to server, ended at byte:"+std::to_string(sended));
+		sended += ret;
+	}
 }
 
 size_t SocketClient::Recv(std::string &data, bool read_to_close)
