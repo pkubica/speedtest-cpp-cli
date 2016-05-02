@@ -2,6 +2,7 @@
 #include <string>
 #include <iostream> //stdout
 #include <errno.h>
+
 #ifdef __linux__ 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -26,7 +27,6 @@ typedef unsigned int SOCKET;
 #else
 #error Platform not supported
 #endif
-
 
 class SocketClient
 {

@@ -1,10 +1,16 @@
 #include "Socket.hpp"
 #include <fstream>
-
+#include "Exception.hpp"
 
 SocketClient::SocketClient(int domain, int type, int protocol, std::string IPaddress, std::string hostname, int port, int timeout) :
 	m_iFamily_domain(domain), m_iSocket_type(type), m_iProtocol(protocol), m_sIPaddress(IPaddress), m_sHostname(hostname), m_iPort(port), m_iTimeout(timeout)
 {
+	if (m_sIPaddress == "" && m_sHostname == "")
+	{
+		throw Exception("Not entered IP or hostname");
+		//TODO: exception not entered IP or hostname
+	}
+
 	hostent *host = NULL;
 	bGetAddrInfoStatus = false;
 	
@@ -24,7 +30,7 @@ SocketClient::SocketClient(int domain, int type, int protocol, std::string IPadd
 	if (m_socSocket == INVALID_SOCKET)
 	{
 		std::cout << "Problem INVALID SOCKET" << std::endl;
-		throw std::exception(); //TODO: exception cannot create socket
+		throw Exception("Cannot create socket"); //TODO: exception cannot create socket
 	}
 
 	FD_ZERO(&m_fdsetSet); /* clear the set */
@@ -42,7 +48,7 @@ SocketClient::SocketClient(int domain, int type, int protocol, std::string IPadd
 		{
 			std::cout << "Problem Resolv" << std::endl;
 			//TODO: cannot resolv hostname //strerror(errno) -- message
-			throw std::exception();
+			throw Exception("Cannot resolve hostname " + m_sHostname);
 		}
 		m_SockAddr.sin_addr.s_addr = *((unsigned long*) host->h_addr);
 	}
@@ -51,11 +57,7 @@ SocketClient::SocketClient(int domain, int type, int protocol, std::string IPadd
 	{
 		m_SockAddr.sin_addr.s_addr = inet_addr(m_sIPaddress.c_str());
 	}
-	else
-	{
-		//TODO: exception not entered IP or hostname
-	}
-
+	
 	if (m_iPort != 0)
 	{
 		m_SockAddr.sin_port = htons(m_iPort);
@@ -70,8 +72,7 @@ void SocketClient::Connect()
 {
 	if (connect(m_socSocket, (sockaddr*) (&m_SockAddr), sizeof(m_SockAddr)) != 0) {
 		//TODO: exception cannot connect
-		std::cout << "Problem Cannot connect" << std::endl;
-		throw std::exception();
+		throw Exception("Cannot connect to host");
 	}
 	//std::cout << "Connected.\n"; //DEBUG
 }

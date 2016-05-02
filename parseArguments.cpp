@@ -26,6 +26,7 @@ limitations under the License.
 #include <cstring>
 
 #include "parseArguments.hpp"
+#include "Exception.hpp"
 
 using namespace std;
 
@@ -262,7 +263,7 @@ void ParseArguments::addArgument(string full_form, string short_form, string hel
 	ret = m_mapsCparamParam_info.insert(pair<string, Param>(full_form, Param(full_form, short_form, help_description, has_a_value, is_required, m_bEquation_format)));
 	if (!ret.second)
 	{
-		throw OptionsException("Parameter --" + full_form + " already exist!");
+		throw Exception("Parameter --" + full_form + " already exist!");
 	}
 
 	if (short_form != "")
@@ -271,7 +272,7 @@ void ParseArguments::addArgument(string full_form, string short_form, string hel
 		ret2 = m_mapssShort_to_long_params.insert(pair<string, string>(short_form, full_form));
 		if (!ret2.second)
 		{
-			throw OptionsException("Short parameter -" + short_form + string(" already exist!"));
+			throw Exception("Short parameter -" + short_form + string(" already exist!"));
 		}
 	}
 
@@ -342,21 +343,21 @@ void ParseArguments::parseArgs(int argc, char *argv [])
 					{
 						if (m_mapsCparamParam_info.at(par).hasValue())
 						{
-							if (value == NULL) throw OptionsException(string("Missing value of parameter '--") + par + string("'!"));
+							if (value == NULL) throw Exception(string("Missing value of parameter '--") + par + string("'!"));
 
 							ret = m_map_ssEntered_param_value.insert(pair<string, string>(par, string(value)));
-							if (!ret.second) throw OptionsException(string("Redefining parameter '--") + par + string("'!"));
+							if (!ret.second) throw Exception(string("Redefining parameter '--") + par + string("'!"));
 							if (!m_bEquation_format) ++i;
 						}
 						else
 						{
 							ret = m_map_ssEntered_param_value.insert(pair<string, string>(par, string("")));
-							if (!ret.second) throw OptionsException(string("Redefining parameter '--") + par + string("'!"));
+							if (!ret.second) throw Exception(string("Redefining parameter '--") + par + string("'!"));
 						}
 					}
 					else
 					{
-						throw OptionsException(string("Invalid parameter '--") + par + string("'!"));
+						throw Exception(string("Invalid parameter '--") + par + string("'!"));
 					}
 				}
 				else if (argv[i][1] != '-')
@@ -370,38 +371,38 @@ void ParseArguments::parseArgs(int argc, char *argv [])
 							if (i + 1 != argc)
 							{
 								ret = m_map_ssEntered_param_value.insert(pair<string, string>(it->second, string(argv[i + 1])));
-								if (!ret.second) throw OptionsException(string("Redefining parameter '--") + param + string("'!"));
+								if (!ret.second) throw Exception(string("Redefining parameter '--") + param + string("'!"));
 								++i;
 							}
 							else
 							{
-								throw OptionsException(string("Missing value of parameter '-") + param + string("'!"));
+								throw Exception(string("Missing value of parameter '-") + param + string("'!"));
 							}
 						}
 						else
 						{
 							ret = m_map_ssEntered_param_value.insert(pair<string, string>(it->second, string("")));
-							if (!ret.second) throw OptionsException(string("Redefining parameter '-") + param + string("'!"));
+							if (!ret.second) throw Exception(string("Redefining parameter '-") + param + string("'!"));
 						}
 					}
 					else
 					{
-						throw OptionsException(string("Invalid parameter '-") + param + string("'!")); //exception: param doesn't exists
+						throw Exception(string("Invalid parameter '-") + param + string("'!")); //exception: param doesn't exists
 					}
 				}
 				else
 				{
-					throw OptionsException(string("Invalid parameter '") + string(argv[i]) + string("'!")); // exception: param must have name 
+					throw Exception(string("Invalid parameter '") + string(argv[i]) + string("'!")); // exception: param must have name 
 				}
 			}
 			else
 			{
-				throw OptionsException(string("Invalid parameter '") + string(argv[i]) + string("'!")); //exception: params must start with '-'
+				throw Exception(string("Invalid parameter '") + string(argv[i]) + string("'!")); //exception: params must start with '-'
 			}
 		}
 		else
 		{
-			throw OptionsException(string("Invalid parameter '") + string(argv[i]) + string("'!")); //exception: param of length less than 2 cannot exists
+			throw Exception(string("Invalid parameter '") + string(argv[i]) + string("'!")); //exception: param of length less than 2 cannot exists
 		}
 	}
 
@@ -440,7 +441,7 @@ void ParseArguments::checkRequiredParams()
 		}
 		else
 		{
-			throw OptionsException(string("Missing required argument --'") + it->first + string("'!")); //exception: param of length less than 2 cannot exists
+			throw Exception(string("Missing required argument --'") + it->first + string("'!")); //exception: param of length less than 2 cannot exists
 		}
 	}
 }

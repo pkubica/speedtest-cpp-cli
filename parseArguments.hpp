@@ -20,27 +20,7 @@ limitations under the License.
 #include <map>
 #define LINE_LENGTH 80
 
-
 using namespace std;
-
-class OptionsException : public std::exception {
-private:
-
-public:
-	std::string _message;
-	OptionsException(const std::string &message)
-	{
-		_message = message;
-	}
-	virtual const char* what() const throw()
-	{
-		return _message.c_str();
-	}
-	~OptionsException() throw()
-	{
-
-	}
-};
 
 class ParseArguments
 {

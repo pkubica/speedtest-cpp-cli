@@ -27,253 +27,21 @@
 #include "Socket.hpp"
 #include "SharedQueue.hpp"
 #include "SharedVariable.hpp"
+#include "HTTPSimple.hpp"
+#include "TAGParser.hpp"
+#include "Exception.hpp"
 
 #define VERSION "0.0.0-1"
 #define PROGRAM_NAME "speedtest-cpp-cli"
 
-#define HTTP_PORT 80
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif // !M_PI
 
+bool G_bSpeedTestMeasure;
+
 using namespace std;
-
-bool SpeedTestMeasure;
-
-SharedQueue<size_t> SpeedResults;
-
-SharedVariable<int> SpeedStatus;
-
-string getTagByName(std::string name, std::string &data)
-{
-	size_t pos = data.find("<" + name + " ");
-	if (pos == string::npos)
-	{
-		return "";
-	}
-	pos += name.size() + 2;
-
-	size_t end_pos = data.find(">", pos);
-	if (end_pos == string::npos)
-	{
-		return "";
-	}
-
-	if (data.at(end_pos - 1) == '/')
-	{
-		end_pos -= 1;
-	}
-
-	if (data.at(end_pos - 1) == ' ')
-	{
-		end_pos -= 1;
-	}
-
-	return data.substr(pos, end_pos - pos);
-}
-
-
-
-
-size_t parseTagAttributes(std::string &data, std::unordered_map<std::string, std::string> &attributes, size_t pos = 0)
-{
-	int state = 0;
-	std::string name = "";
-	std::string value = "";
-	for (; pos < data.size(); ++pos)
-	{
-		if (state == 0 && data[pos] == '/')
-		{
-			//cout << "returning" << endl;
-			return pos;
-		}
-
-		switch (state)
-		{
-		case 0:
-			if (data[pos] == '=')
-			{
-				++state;
-				continue;
-			}
-			name += data[pos];
-			continue;
-		case 1:
-			if (data[pos] == '"')
-			{
-				++state;
-				continue;
-			}
-			else
-			{
-				//TODO: parse error, missing started "
-			}
-			continue;
-		case 2:
-			if (data[pos] == '"')
-			{
-				attributes.insert(pair<string, string>(name, value));
-				name = "";
-				value = "";
-				++state;
-				continue;
-			}
-			value += data[pos];
-			continue;
-		case 3:
-			//cout << "name:" << name << " value:" << value << endl;
-			state = 0;
-			continue;
-		}
-	}
-	return pos;
-}
-
-void splitUrlIntoPageHost(std::string &url, std::string &host)
-{
-	if (url.compare(0, 7, "http://") == 0)
-	{
-		url.erase(0, 7);
-	}
-
-	unsigned int j = 0;
-	for (; j < url.size() && url[j] != '/'; ++j)
-	{
-		host += url[j];
-	}
-
-	if (j < url.size()) //found /
-	{
-		url.erase(0, j);
-	}
-	else //url containts only host address
-	{
-		url.clear();
-		url += '/';
-	}
-}
-
-string buildHTTPrequest(std::string page, std::string host, bool keepAlive)
-{
-	std::string user_agent = "Mozilla/5.0 "
-#ifdef __linux__ 
-		"(Linux; U; 64bit; en-us; Trident/5.0) "
-#elif _WIN32
-		"(Windows; U; 32bit; en-us) "
-#else
-#error Platform not supported
-#endif
-		"(KHTML, like Gecko) "
-		PROGRAM_NAME "/"
-		VERSION;
-
-	std::string request =
-		"GET " + page + " HTTP/1.1\r\n"
-		"Accept-Encoding: identity\r\n"
-		"Host: " + host + "\r\n"
-		"User-Agent: " + user_agent + "\r\n"
-		"Connection: close\r\n"
-		"\r\n";
-
-	return request;
-}
-
-void removeFileFromHTTPAdress(std::string &url)
-{
-#if __cplusplus > 199711L
-	while (url.back() != '/')
-	{
-		url.pop_back();
-	}
-#else
-	while (*url.rbegin() != '/')
-	{
-		url = url.substr(0, url.size() - 1);
-	}
-#endif
-
-}
-
-void removeChunckEncoding(std::string &data)
-{
-	std::string tmp = data;
-	data.clear();
-	int status = 0;
-	bool up = false;
-	for (std::string::iterator it = tmp.begin(); it != tmp.end(); ++it)
-	{
-		switch (status)
-		{
-		case 0:
-			if (*it == '\r')
-			{
-				++status;
-				continue;
-			}
-			data += *it;
-			continue;
-		case 1:
-			if (*it == '\n')
-			{
-				if (up)
-				{
-					up = false;
-					--status;
-					continue;
-				}
-				else
-				{
-					up = true;
-					++status;
-					continue;
-				}
-
-			}
-			else
-			{
-				data += '\r';
-				data += *it;
-				if (up)
-				{
-					++status;
-					continue;
-				}
-				else
-				{
-					--status;
-					continue;
-				}
-			}
-		case 2:
-			if (*it == '\r')
-			{
-				--status;
-			}
-			continue;
-		}
-	}
-}
-
-int parseHTTPResponse(std::string &data)
-{
-	string endHeader = "\r\n\r\n";
-	size_t pos_end_header = data.find(endHeader);
-	std::string HTTPHeader = data.substr(0, pos_end_header);
-
-	int response_code = stoi(HTTPHeader.substr(9, 3));
-
-	if (string::npos != HTTPHeader.find("Transfer-Encoding: chunked"))
-	{
-		data.erase(0, pos_end_header + 2);
-		removeChunckEncoding(data);
-	}
-	else
-	{
-		data.erase(0, pos_end_header + 4);
-	}
-
-	return response_code;
-}
 
 class SpeedTestClient
 {
@@ -300,20 +68,21 @@ private:
 	std::unordered_map<int, Server> m_mapServers;
 	std::multimap<float, int> m_multimapDistance;
 
-	std::map<string, string> m_mapServerUrls;
+	int m_sServersUrlSize;
+	std::string m_sServersUrl[4];
 
 	float m_dLat;
 	float m_dLon;
 
 	void buildIMGrequests(std::string &path, std::list<std::string> &urls)
 	{
-		int sizes[10] = { 350, 500, 750, 1000, 1500, 2000, 2500, 3000, 3500, 4000 };
+		std::list<int> sizes = { 350, 500, 750, 1000, 1500, 2000, 2500, 3000, 3500, 4000 };
 		int count = stoi(m_umapDownload.at("threadsperurl"));
-		for (int i = 0; i < 10; ++i)
+		for (std::list<int>::iterator it = sizes.begin(); it != sizes.end(); ++it)
 		{
 			for (int j = 0; j < count; ++j)
 			{
-				urls.push_back(path + "random" + std::to_string((long long int) sizes[i]) + "x" + std::to_string((long long int) sizes[i]) + ".jpg");
+				urls.push_back(path + "random" + std::to_string((long long int) *it) + "x" + std::to_string((long long int) *it) + ".jpg");
 			}
 		}
 	}
@@ -344,7 +113,7 @@ private:
 			{
 				pos += search.size();
 				std::unordered_map<string, string> tmp;
-				pos = parseTagAttributes(data, tmp, pos);
+				pos = TAGParser::parseTagAttributes(data, tmp, pos);
 
 				float distance = calculateDistance(to_radian(stof(tmp.at("lat"))), to_radian(stof(tmp.at("lon"))));
 
@@ -421,33 +190,30 @@ public:
 
 	void getConfig()
 	{
-		SocketClient sockfd(AF_INET, SOCK_STREAM, IPPROTO_TCP, "", "www.speedtest.net", HTTP_PORT);
-		std::string data = "";
+		HTTPSimple http;
+		std::string page;
 		try
 		{
-			sockfd.Connect();
-			std::string request = buildHTTPrequest("/speedtest-config.php", "www.speedtest.net", false);
-			sockfd.Send(request);
-			sockfd.Recv(data, true);
-			if (parseHTTPResponse(data) != 200)
+			page = http.GET("http://www.speedtest.net/speedtest-config.php");
+			if (http.getCode() != 200)
 			{
 				//TODO: exception NOT OK
 			}
 		}
 		catch (exception &e)
 		{
-			e.what();
+			cout << e.what() << endl;
 		}
 #ifdef DEBUG
 		cout << "data>" << data << endl;
 #endif
 		//get TAG: client, times, download, upload, latency
-		std::string client = getTagByName("client", data);
-		std::string times = getTagByName("times", data);
-		std::string download = getTagByName("download", data);
-		std::string upload = getTagByName("upload", data);
-		std::string latency = getTagByName("latency", data);
-		std::string server_config = getTagByName("server-config", data);
+		std::string client = TAGParser::getTagByName("client", page);
+		std::string times = TAGParser::getTagByName("times", page);
+		std::string download = TAGParser::getTagByName("download", page);
+		std::string upload = TAGParser::getTagByName("upload", page);
+		std::string latency = TAGParser::getTagByName("latency", page);
+		std::string server_config = TAGParser::getTagByName("server-config", page);
 		/*
 				cout << client << endl;
 				cout << times << endl;
@@ -455,12 +221,12 @@ public:
 				cout << upload << endl;
 				cout << latency << endl;
 		*/
-		parseTagAttributes(client, m_umapClient);
-		parseTagAttributes(times, m_umapTimes);
-		parseTagAttributes(download, m_umapDownload);
-		parseTagAttributes(upload, m_umapUpload);
-		parseTagAttributes(latency, m_umapLatency);
-		parseTagAttributes(server_config, m_umapServerConfig);
+		TAGParser::parseTagAttributes(client, m_umapClient);
+		TAGParser::parseTagAttributes(times, m_umapTimes);
+		TAGParser::parseTagAttributes(download, m_umapDownload);
+		TAGParser::parseTagAttributes(upload, m_umapUpload);
+		TAGParser::parseTagAttributes(latency, m_umapLatency);
+		TAGParser::parseTagAttributes(server_config, m_umapServerConfig);
 
 		//TODO: check IF ALL TAG IS OK
 
@@ -486,125 +252,80 @@ public:
 
 	void getClosestServers()
 	{
-		for (std::map<string, string>::iterator it = m_mapServerUrls.begin(); it != m_mapServerUrls.end(); ++it)
+		for (int i = 0; i < m_sServersUrlSize; ++i)
 		{
 			std::string data = "";
+			HTTPSimple http;
 			try
 			{
-				SocketClient sockfd(AF_INET, SOCK_STREAM, IPPROTO_TCP, "", it->first, HTTP_PORT);
-				sockfd.Connect();
-				std::string request = buildHTTPrequest(it->second, it->first, false);
-				sockfd.Send(request);
-#ifdef DEBUG
-				std::cout << "wait for data from:" << it->first << endl;
-#endif
-				sockfd.Recv(data, true);
-#ifdef DEBUG
-				std::cout << "Received:" << it->first << endl;
-#endif				
+				data = http.GET(m_sServersUrl[i]);
 			}
-			catch (exception &e)
+			catch (...)
 			{
-				cerr << e.what() << endl;
+				continue;
 			}
 
-			if (parseHTTPResponse(data) != 200)
+			if (http.getCode() != 200)
 			{
-#ifdef DEBUG
-				cout << data; //DEBUG
-#endif
 				continue;
 			}
 			else
 			{
 				parseServers(data);
-				break;
+				return;
 			}
 		}
 
+		throw Exception("Cannot retrieve speedtest server-list");
 		//TODO: exception, cannot retrieve server list !!!
 
 	}
 
 	int64_t getLatencyByServer(int id)
 	{
-		if (!checkifServerExists(id)) return 1 * 60 * 1000 * 1000; //minutes
+		if (!checkifServerExists(id))
+			throw Exception("Wrong server ID, cannot test - server doesn't exists");
+			// return 1 * 60 * 1000 * 1000; //minutes
 			//TODO EXCEPTION - server doesnt exits
 
 		string url = m_mapServers.at(id).m_umapData.at("url");
 
 		//SERVER URL remove end to slash
-		removeFileFromHTTPAdress(url);
-		string host = "";
-		splitUrlIntoPageHost(url, host);
 
-
-		std::string request = buildHTTPrequest(url + "latency.txt", host, false);
-		std::list<int64_t> request_latence;
-		std::string response;
-#if __cplusplus >= 199711L
-		std::chrono::high_resolution_clock::time_point start_time;
-		std::chrono::high_resolution_clock::time_point end_time;
-#else
-		std::chrono::time_point<std::chrono::monotonic_clock> start_time;
-		std::chrono::time_point<std::chrono::monotonic_clock> end_time;
-#endif
-
+		std::list<int64_t> request_latency;
+		HTTPSimple http;
+		http.removeFileFromUrl(url);
 		for (int i = 0; i < m_constLatence_tries; ++i)
 		{
+			std::string data;
 			try
 			{
-				//CREATE SOCKET
-				SocketClient sockfd(AF_INET, SOCK_STREAM, IPPROTO_TCP, "", host, HTTP_PORT);
-				//CONNECT
-				sockfd.Connect();
-				//TIME START
-				start_time = chrono::high_resolution_clock::now();
-
-				//SEND req
-				sockfd.Send(request);
-				//RECEIVE
-				sockfd.Recv(response, true);
-				end_time = chrono::high_resolution_clock::now();
-
+				data = http.GET(url + "latency.txt");
 			}
 			catch (exception &e)
 			{
 				cout << "exception: ";
 				cout << e.what();
 			}
+
 			// check receieved message -> test=test & 200
-			if (parseHTTPResponse(response) == 200)
+			if (http.getCode() == 200 && data.compare("test=test\n") == 0)
 			{
-#ifdef DEBUG
-				cout << "data:\"" << response << "\"" << endl;
-#endif
-				if (response.compare("test=test\n") == 0)
-				{
-					request_latence.push_back(chrono::duration_cast<chrono::microseconds>(end_time - start_time).count());
-#ifdef DEBUG
-					cout << "tmp latence" << request_latence.back() << endl;
-#endif
-					response.clear();
-					continue;
-				}
+				request_latency.push_back(http.getRequestLatency());
+				continue;
 			}
 
 			// exception -> 1 minute time
-#ifdef DEBUG
-			cout << "data:\"" << response << "\"" << endl;
-#endif
-			request_latence.push_back(1 * 60 * 1000 * 1000); //1 minute
-#ifdef DEBUG
-			cout << "Hoston we have a problem" << endl;
-#endif					//clear for new request
+			request_latency.push_back(1 * 60 * 1000 * 1000); //1 minute
+			//clear for new request
 
 		}
+
 		int64_t sum = 0;
-		for (std::list<int64_t>::iterator jt = request_latence.begin(); jt != request_latence.end(); ++jt)
+		for (std::list<int64_t>::iterator jt = request_latency.begin(); jt != request_latency.end(); ++jt)
 			sum += *jt;
 
-		sum /= request_latence.size();
+		sum /= request_latency.size();
 		return sum;
 	}
 
@@ -640,13 +361,13 @@ public:
 		return serverID.at(minimum_pos);
 	}
 
-	class urlImage
+	class DLJob
 	{
 		std::string m_sUrl;
 		std::string m_sHost;
 		std::string m_sRequest;
-		size_t m_iData_count;
-
+		int m_iJob_type;
+		SharedQueue<size_t> *m_SpeedResults;
 
 		//int64_t m_i64Timeout;
 		//int64_t m_i64Start_time;
@@ -654,30 +375,28 @@ public:
 
 	public:
 		//urlImage(std::string &url, int64_t timeout, int64_t start_time): m_sUrl(url), m_i64Timeout(timeout), m_i64Start_time(start_time)
-		urlImage(std::string &url) : m_sUrl(url)
+		DLJob(std::string &url, std::string &data, int job_type, SharedQueue<size_t> *speedResults):
+			m_sUrl(url), m_iJob_type(job_type), m_SpeedResults(speedResults)
 		{
-			m_iData_count = 0;
-			splitUrlIntoPageHost(m_sUrl, m_sHost);
-			m_sRequest = buildHTTPrequest(m_sUrl, m_sHost, false);
+			HTTPSimple http;
+			if (job_type == 0)
+			{
+				m_sRequest = http.GETrequest(m_sUrl);
+			}
+			else
+			{
+				m_sRequest = http.POSTrequest(m_sUrl, data);
+			}
+			m_sHost = http.getHost();
+
 			sockfd = new SocketClient(AF_INET, SOCK_STREAM, IPPROTO_TCP, "", m_sHost, HTTP_PORT);
-			try
-			{
-				//cout << "connected" << endl;
-				//cout << "host:" << m_sHost << "url" << m_sUrl << endl;
-			}
-			catch (exception &e)
-			{
-				delete sockfd;
-				throw e;
-			}
 		}
 
-		~urlImage()
+		~DLJob()
 		{
 			delete sockfd;
 		}
 
-		size_t getResult() { return m_iData_count; }
 		//std::string getUrl() { return m_sUrl; }
 		//int64_t getDuration() { return chrono::duration_cast<chrono::microseconds>(end_time - start_time).count(); }
 		//void setDuration(int64_t duration) { m_i64Duration = duration; }
@@ -687,17 +406,33 @@ public:
 		{
 			try
 			{
-
-
 				sockfd->Connect();
 				//check started time
 				//cout << "sending request" << endl;
-				sockfd->Send(m_sRequest);
+				if (m_iJob_type == 0)
+				{
+					sockfd->Send(m_sRequest);
+				}
+				else
+				{
+					sockfd->Send(m_sRequest);
+				}
 				//cout << "req:" << m_sRequest << endl;
-				size_t ret;
-				while (SpeedTestMeasure && ((ret = sockfd->_devNullRecv()) > 0))
-					SpeedResults.add(ret); //SIZE OF BUFFER ON SOCKET -- TODO: TESTING
-				return;
+				if (m_iJob_type == 0)
+				{
+					size_t ret;
+					while (G_bSpeedTestMeasure && ((ret = sockfd->_devNullRecv()) > 0))
+						m_SpeedResults->add(ret); //SIZE OF BUFFER ON SOCKET -- TODO: TESTING
+					return;
+				}
+				else
+				{
+					size_t ret;
+					while (G_bSpeedTestMeasure && ((ret = sockfd->_devNullRecv()) > 0))
+						m_SpeedResults->add(ret); //SIZE OF BUFFER ON SOCKET -- TODO: TESTING
+					return;
+				}
+
 			}
 			catch (...)
 			{
@@ -710,23 +445,27 @@ public:
 	class IncomingDataWorker //: public thread // Thread
 	{
 		int64_t m_i64Duration;
-		SharedQueue<urlImage *>& m_sqSourceQueue;
-		SharedQueue<urlImage *>& m_sqTargetQueue;
-
+		SharedQueue<DLJob *>& m_sqSourceQueue;
+		SharedQueue<DLJob *>& m_sqTargetQueue;
+		SharedVariable<int> *m_SpeedStatus;
+		
 	public:
-		IncomingDataWorker(SharedQueue<urlImage *>& source_queue, SharedQueue<urlImage *>& target_queue) : m_sqSourceQueue(source_queue), m_sqTargetQueue(target_queue){}
+		IncomingDataWorker(SharedQueue<DLJob *>& source_queue, SharedQueue<DLJob *>& target_queue, SharedVariable<int>* speedStatus):
+			m_sqSourceQueue(source_queue), m_sqTargetQueue(target_queue), m_SpeedStatus(speedStatus) 
+		{
+		}
 
 		void run() {
 			for (int i = 0;; i++) {
 				//cout << "run is runned" << endl;
 				if (m_sqSourceQueue.isThereaWork() > 0)
 				{
-					if (!SpeedTestMeasure)
+					if (!G_bSpeedTestMeasure)
 					{
 						return; //10sec test
 					}
 					//cout << "want thread get item" << endl;
-					urlImage *item = m_sqSourceQueue.soIgetIt();
+					DLJob *item = m_sqSourceQueue.soIgetIt();
 					//cout << "thread get item" << endl;
 					item->run();
 					//cout << "thread did item result: " << item->getResult() << endl;
@@ -735,7 +474,7 @@ public:
 				}
 				else
 				{
-					SpeedStatus.set(SpeedStatus.get()+1);
+					m_SpeedStatus->set(m_SpeedStatus->get()+1);
 					return;
 				}
 			}
@@ -745,24 +484,28 @@ public:
 	double speedtestDownload(int id)
 	{
 		if (!checkifServerExists(id))
-			return 0;
+			throw Exception("Wrong server ID, cannot test - server doesn't exists");
 
 		int workers_count = stoi(m_umapServerConfig.at("threadcount"));
 		if (workers_count == 0)
-			return 0; //EXCEPTION !!! 
+			throw Exception("Configuration of speedtest.net was changed, need to examine");
 
 		std::list<std::string> urls;
 		std::string url = m_mapServers.at(id).m_umapData.at("url");
-		removeFileFromHTTPAdress(url);
+		HTTPSimple http;
+		http.removeFileFromUrl(url);
 
 		buildIMGrequests(url, urls);
 
-		SharedQueue<urlImage *> qsource;
-		SharedQueue<urlImage *> qtarget;
+		SharedQueue<DLJob *> qsource;
+		SharedQueue<DLJob *> qtarget;
+
+		SharedQueue<size_t> speedResults;
+		SharedVariable<int> speedStatus;
 
 		std::vector<thread *> workers;
 		std::vector<IncomingDataWorker *> workon;
-		std::vector<urlImage> images;
+		std::vector<DLJob> images;
 		std::list<double> speeds; 
 
 #if __cplusplus >= 199711L
@@ -778,39 +521,40 @@ public:
 #endif
 
 
-		SpeedTestMeasure = true;
+		G_bSpeedTestMeasure = true;
 
 		start_time = chrono::high_resolution_clock::now();
-
+		
 		for (std::list<std::string>::iterator it = urls.begin(); it != urls.end(); ++it)
 		{
-			qsource.add(new urlImage(*it));
+			std::string data = "";
+			qsource.add(new DLJob(*it, data, 0, &speedResults));
 		}
 			
 		for (int i = 0; i < workers_count; ++i)
 		{
-			workon.push_back(new IncomingDataWorker(qsource, qtarget));
+			workon.push_back(new IncomingDataWorker(qsource, qtarget, &speedStatus));
 		}
 
 
 		for (int i = 0; i < workers_count; ++i)
 		{
-			workers.push_back(new thread(&IncomingDataWorker::run, workon.at(i)));
+			workers.push_back(new thread(&IncomingDataWorker::run, workon.at(i))); //nejsem si jist
 		}
 
-
 		start_time = chrono::high_resolution_clock::now(); //SET TIMEOUT
-		SpeedStatus.set(0);
+		
+		speedStatus.set(0);
 		size_t datasize;
 		int64_t time;
 		check_time = chrono::high_resolution_clock::now();
 		//cout << "count_images" << count_images << endl;
-		while (SpeedStatus.get() != workers_count)
+		while (speedStatus.get() != workers_count)
 		{
 			datasize = 0;
-			while (SpeedResults.size() > 0)
+			while (speedResults.size() > 0)
 			{
-				datasize += SpeedResults.remove();
+				datasize += speedResults.remove();
 			}
 
 #if __cplusplus >= 199711L
@@ -847,20 +591,20 @@ public:
 			}
 		}
 
+		G_bSpeedTestMeasure = false;
 
 		double speed_max = 0;
 		double speed_sum = 0;
 		int speed_count = 0;
 
-		for (size_t i = 0; i < speeds.size(); ++i)
+		for (std::list<double>::iterator it = speeds.begin(); it != speeds.end(); ++it)
 		{
-			if (speed_max < speeds.front())
+			if (speed_max < *it)
 			{
-				speed_max = speeds.front();
+				speed_max = *it;
 			}
-			speed_sum += speeds.front();
+			speed_sum += *it;
 			++speed_count;
-			speeds.pop_front();
 		}
 
 		double avg_speed = speed_sum / speed_count;
@@ -868,17 +612,14 @@ public:
 		cout << "Maximum download speed: " << speed_max << " MBit/s" << endl;
 		cout << "Average download speed: " << avg_speed << " MBit/s" << endl;
 		
-		SpeedTestMeasure = false;
-
 		for (int i = 0; i < workers_count; ++i)
 		{
 			workers.at(i)->join();
 		}
 
-
 		while (qtarget.size() > 0)
 		{
-			urlImage *item = qtarget.remove();
+			DLJob *item = qtarget.remove();
 			delete item;
 		}
 
@@ -895,14 +636,41 @@ public:
 
 	}
 
+	void speedTestUpload()
+	{
+		std::vector<int> sizes = { 250000, 500000 };
+		string text = "ABCDEFGHIJKLMNOPQRSTUVWXZabcdefghijklmnopqrstuvwxyz0123456789";
+		std::string message1;
+		message1.resize(sizes[0]);
+		std::string message2;
+		message2.resize(sizes[1]);
+		int len = text.size();
+
+		for (int i = 0; i < sizes[0]; ++i)
+		{
+			char ch = text[i % len];
+			message2.append(1,ch);
+		}
+
+		for (int i = 0; i < sizes[1]; ++i)
+		{
+			char ch = text[i % len];
+			message2.append(1,ch);
+		}
+
+		//25x first, 25x second = 50jobs
+
+	}
+
 	SpeedTestClient()
 	{
+		m_sServersUrlSize = 4;
 		m_constNumber_of_srv_lat = 5;
 		m_constLatence_tries = 4;
-		m_mapServerUrls.insert(std::pair<string, string>("www.speedtest.net", "/speedtest-servers-static.php"));
-		m_mapServerUrls.insert(std::pair<string, string>("c.speedtest.net", "/speedtest-servers-static.php"));
-		m_mapServerUrls.insert(std::pair<string, string>("www.speedtest.net", "/speedtest-servers.php"));
-		m_mapServerUrls.insert(std::pair<string, string>("c.speedtest.net", "/speedtest-servers.php"));
+		m_sServersUrl[0] = "http://www.speedtest.net/speedtest-servers-static.php";
+		m_sServersUrl[1] = "http://c.speedtest.net/speedtest-servers-static.php";
+		m_sServersUrl[2] = "http://www.speedtest.net/speedtest-servers.php";
+		m_sServersUrl[3] = "http://c.speedtest.net/speedtest-servers.php";
 	}
 
 };
