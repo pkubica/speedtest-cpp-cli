@@ -87,6 +87,7 @@ size_t SocketClient::Send(std::string &data)
 		if (ret == -1) throw Exception("Cannot send data to server, ended at byte:"+std::to_string(sended));
 		sended += ret;
 	}
+	return size_to_send;
 }
 
 size_t SocketClient::Recv(std::string &data, bool read_to_close)
